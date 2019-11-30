@@ -1,0 +1,13 @@
+[Unit]
+Description=My Credit card
+After=network-online.target
+
+[Service]
+Type=simple
+User={{ APP_USER }}
+ExecStart=/usr/bin/java -jar /opt/creditcard/credit-card-app.jar
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,61 @@
+---
+- hosts: proxy
+  become: yes
+  vars:
+    NODE_PRIVATE_IP: <private_ip>
+    EPEL_REPO: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+  tasks:
+    - name: "epel repo"
+      yum:
+        name: "{{ EPEL_REPO }}"
+    - name: "install nginx"
+      yum:
+        name: nginx
+    - name: "config nginx as proxy"
+      template:
+        src: templates/proxy.conf
+        dest: /etc/nginx/conf.d/proxy.conf
+    - name: "restart nginx"
+      service:
+        name: nginx
+        state: restarted
+
+- hosts: app_nodes
+  become: yes
+  vars:
+    REPO_URL: https://github.com/qwark97/pp5.git
+    PROJECT_STAGE: master
+    APP_USER: thief
+  tasks:
+    - name: install os dep
+      yum:
+        name: [java-1.8.0-openjdk, maven, git]
+    - name: clone repo
+      git:
+        repo: "{{REPO_URL}}"
+        dest: /tmp/cc-repo
+        version: "{{ PROJECT_STAGE }}"
+    - name: build it
+      command: mvn package -Dmaven.test.skip=true
+      args:
+        chdir: /tmp/cc-repo
+    - file:
+        path: /opt/creditcard
+        state: directory
+    - name: move artifact to it dest
+      command: mv /tmp/cc-repo/target/credit-card-app-1.0.jar /opt/creditcard/credit-card-app.jar
+    - user:
+        name: "{{ APP_USER }}"
+    
+    - name: "put service config into place"
+      template:
+        src: templates/creditcard.service
+        dest: /etc/systemd/system/creditcard.service
+
+    - name: restart my service
+      systemd:
+        name: creditcard
+        state: restarted
+        daemon_reload: yes
+        enabled: true
+
